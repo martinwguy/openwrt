@@ -38,6 +38,7 @@ for a in host target-mips_24kc_musl-1.1.16 toolchain-mips_24kc_gcc-5.4.0_musl-1.
 	CCACHE_DIR=../ccache/$a ccache -z
 done
 
+# Configuration options tuned for minimal flash size
 (
 echo	TARGET_ar71xx=y		# Target system
 echo	TARGET_ar71xx_generic_DEVICE_tl-mr3220-v1=y	# Target profile
@@ -47,6 +48,7 @@ echo	 SIGNED_PACKAGES=n
 echo	 KERNEL_PRINTK=n
 echo	 KERNEL_CRASHLOG=n
 echo	 KERNEL_SWAP=n
+echo	 KERNEL_DEBUG_FS=n
 echo	 KERNEL_KALLSYMS=n
 echo	 KERNEL_DEBUG_INFO=n
 echo	 KERNEL_MAGIC_SYSRQ=n
@@ -63,10 +65,12 @@ echo	 PKG_RELRO_PARTIAL=y
       # Advanced configuration for developers
 echo	DEVEL=y
 echo	 CCACHE=y
+echo	 TOOLCHAINOPTS=y
+echo	  GDB=n			# Reduce build time
       # Image configuration
 echo	IMAGEOPT=y
-echo	 PER_FEED_REPO=y 	#  Separate feed respositories
-echo	  FEED_luci=y		#   Enable feed luci
+echo	 PER_FEED_REPO=y 	# Separate feed respositories
+echo	  FEED_luci=y		# Enable feed luci
       # Base system
 echo	 PACKAGE_logd=n
 echo	 PACKAGE_rpcd=y
