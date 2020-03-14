@@ -2,18 +2,20 @@
 
 # Fetch and build the firmware for the TP-Link TL_MR3220v1
 
-# This removes anything "unnecessary", except for
-# ed instead of vi
-# df because I want to check flash usage
-# md5sum maybe could go. It's used in scripts but doesn't solve the
-#	package verification issue
-# dropbear's *5519 cipher
-# Could drop UNIX98 devpts support in busybox and kernel
-
-# Strangely, BUSYBOX_CONFIG_INSTALL_APPLET_HARDLINKS=y makes files in /bin that all
-# have a link count of 1 because they are basic squashfs files, not extended files.
-# Also strangely, md5sum is called by several of LEDE's scripts, but
-# with BUSYBOX_CONFIG_MD5SUM=n everything still seems to work.
+# This removes anything "unnecessary", including
+# USB support
+# PPPoE support
+# md5sum, even though some scripts seem to call it, everything works.
+# opkg (though /usr/lib/opkg persists at 136K)
+#
+# Stuff that's needed:
+# BUSYBOX_CONFIG_ENV	Used by the ifup/ifdown buttons in luci
+#
+# More stuff that could go:
+# readlink. /etc/rc.common complains but everything seems to work.
+# UNIX98 devpts support in busybox and kernel.
+# df
+# du probably too.
 
 # The last branch to support the MR3220 was 17.01.*;
 # branch openwrt-18.06 doesn't include mr3220 when ar71xx is selected.
@@ -21,8 +23,13 @@
 BRANCH=lede-17.01
 
 # $DOWNLOAD: Do we need to download/unpack the source tree?
-# Do so if it doesn't exist.
-test -d "$BRANCH" && DOWNLOAD=false || DOWNLOAD=true
+# Do so if it doesn't exist. Note that this script may also be run from the top
+# directory of the source tree, as "../MR3220", so check for that case too.
+if [ -d $BRANCH -o "`basename $(pwd)`" = $BRANCH ]; then
+	DOWNLOAD=false
+else
+	DOWNLOAD=true
+fi
 
 $DOWNLOAD && {
 test -d $BRANCH && {
@@ -51,7 +58,7 @@ fi
 
 }
 
-cd $BRANCH
+test -d $BRANCH && cd $BRANCH
 
 # We keep the download directory elsewhere to protect it from deletion
 mkdir -p ../dl
@@ -99,10 +106,8 @@ echo	 CCACHE=y
 echo	 TOOLCHAINOPTS=y
 echo	  GDB=n			# Reduce build time
 
-      # Image configuration
-echo	IMAGEOPT=y
-echo	 PER_FEED_REPO=y 	# Separate feed respositories
-echo	  FEED_luci=y		# Enable feed luci
+      # Build the LEDE Image Builder
+echo    IB=y
 
       # Base system
       #  Busybox
@@ -132,7 +137,8 @@ echo	    BUSYBOX_CONFIG_ID=n
 echo	    BUSYBOX_CONFIG_FEATURE_TEST_64=n
 echo	    BUSYBOX_CONFIG_FEATURE_TOUCH_SUSV3=n
 echo	    BUSYBOX_CONFIG_FEATURE_TR_CLASSES=n
-echo	    BUSYBOX_CONFIG_DF=n
+#echo	    BUSYBOX_CONFIG_DF=n
+echo	    BUSYBOX_CONFIG_DU=n
 echo	    BUSYBOX_CONFIG_EXPR=n
 echo	    BUSYBOX_CONFIG_FSYNC=n
 echo	    BUSYBOX_CONFIG_HEAD=n
@@ -146,7 +152,6 @@ echo	    BUSYBOX_CONFIG_MKFIFO=n
 echo	    BUSYBOX_CONFIG_MKNOD=n
 echo	    BUSYBOX_CONFIG_NICE=n
 echo	    BUSYBOX_CONFIG_PWD=n
-echo	    BUSYBOX_CONFIG_READLINK=n
 echo	    BUSYBOX_CONFIG_SEQ=n
 echo	     BUSYBOX_CONFIG_FANCY_SLEEP=n
 echo	    BUSYBOX_CONFIG_TAIL=n
@@ -189,7 +194,7 @@ echo	    BUSYBOX_CONFIG_FEATURE_GREP_EGREP_ALIAS=n # grep -E is only used by
 echo	    BUSYBOX_CONFIG_FEATURE_GREP_CONTEXT=n
 echo	    BUSYBOX_CONFIG_XARGS=n
       #   Login/password management utilities
-echo	    BUSYBOX_CONFIG_FEATURE_SHADOWPASSWDS=n
+#echo	    BUSYBOX_CONFIG_FEATURE_SHADOWPASSWDS=n
 echo	    BUSYBOX_CONFIG_FEATURE_PASSWD_WEAK_CHECK=n
       #   Linux system utilities
 echo	    BUSYBOX_CONFIG_FEATURE_MOUTNT_CIFS=n	# Don't need to mount Samba
@@ -206,7 +211,7 @@ echo	    BUSYBOX_CONFIG_TIME=n
 echo	    BUSYBOX_CONFIG_NC=n
 echo	    BUSYBOX_CONFIG_FEATURE_FANCY_PING=n
 echo	    BUSYBOX_CONFIG_FEATURE_IPV6=n
-echo	    BUSYBOX_CONFIG_FEATURE_VERBOSE_RESOLUTION_ERRORS=n
+echo	    BUSYBOX_CONFIG_VERBOSE_RESOLUTION_ERRORS=n
 echo	    BUSYBOX_CONFIG_BRCTL=n
 echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_STATUS=n
 echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_HW=n
@@ -229,11 +234,19 @@ echo	    BUSYBOX_CONFIG_SH_MATH_SUPPORT_64=n
 echo	    BUSYBOX_CONFIG_LOGGER=n
 echo	DROPBEAR_CURVE25519=n
 echo	PACKAGE_logd=n
-echo	PACKAGE_rpcd=y
+echo	PACKAGE_opkg=n
+echo	PACKAGE_rpcd=y		# needed by luci
+echo	PACKAGE_swconfig=n
 
       # Kernel modules
       #  Network support
 echo	  PACKAGE_kmod-ppp=n
+      #  Other modules
+echo	  PACKAGE_kmod-gpio-button-hotplug=n
+      #  USB suopprt
+echo	  PACKAGE_kmod-usb-core=n
+echo	  PACKAGE_kmod-usb-ledtrig-usbport=n
+echo	  PACKAGE_kmod-usb2=n
       #  Wireless drivers
       #   kmod-ath
 echo	  PACKAGE_kmod-ath=y	# Maybe this'll make the next line work
@@ -255,10 +268,13 @@ echo	 PACKAGE_libubus-lua=y		# Needed by luci
 echo	 PACKAGE_libuci-lua=y		# Needed by luci
 
       # Network
+      #  VPN
+echo	  PACKAGE_openvpn-openssl=y
       #  Web servers/proxies
 echo	  PACKAGE_uhttpd=y		# Needed by luci
 echo	  PACKAGE_uhttpd-mod-ubus=y	# Needed by luci
 echo	 PACKAGE_ppp=n
+echo	 PACKAGE_wpad-mini=n		# I don't use WPA
 
 ) | sed 's/^/CONFIG_/' > .config
 
@@ -267,19 +283,33 @@ make defconfig
 $DOWNLOAD && make download
 rm -rf bin/targets/ar71xx/generic/*
 make -j4
-cp -p bin/targets/ar71xx/generic/*-factory.bin /tmp/fw.bin
 
-# log in to the router as root
-#	ssh root@192.168.1.1
-# and issue the following commands at LEDE's root prompt
-#	cd /tmp
-#	scp 192.168.1.178:/tmp/fw.bin .
-# Flash the new firmware, be verbose and don't save the settings
-#	sysupgrade -v -n fw.bin
-# When it goes quiet, disconnect the ssh connection by pressing [~] then [.]
-# When the router has rebooted, ssh into it again and say
-#	passwd root	# Set the admin password
-#	opkg update
-#	opkg install luci
+test "`basename $(pwd)`" = $BRANCH && cd ..
+rm -rf lede-imagebuilder-*
+tar xf "$(find $BRANCH -name lede-imagebuilder-*z)"
+cd lede-imagebuilder-*
+( echo src imagebuilder file:packages
+  echo src/gz reboot http://downloads.lede-project.org/releases/17.01-SNAPSHOT/packages/mips_24kc/luci
+) > repositories.conf
 
-# Now you should be able to browse to 192.168.1.1
+make image TARGET=tl-mr3220-v1 PACKAGES="base-files busybox dnsmasq dropbear \
+	firewall fstools fwtool hostapd-common iptables iw jshn jsonfilter kernel \
+	kmod-ath kmod-ath9k kmod-ath9k-common kmod-cfg80211 kmod-ipt-conntrack \
+	kmod-ipt-core kmod-ipt-nat kmod-mac80211 kmod-nf-conntrack kmod-nf-ipt \
+	kmod-nf-nat kmod-nls-base libblobmsg-json libc libgcc libip4tc \
+	libiwinfo-lua libjson-c libjson-script liblua libnl-tiny libpthread \
+	libubox libubus libubus-lua libuci libuci-lua libuclient libxtables lua \
+	luci-app-firewall luci-base luci-lib-ip luci-lib-jsonc luci-lib-nixio \
+	mtd netifd odhcpd procd rpcd uboot-envtools ubox ubus ubusd uci \
+	uclient-fetch uhttpd uhttpd-mod-ubus wpad-mini \
+	openvpn-openssl luci-app-openvpn \
+	luci-base luci-app-firewall luci-mod-admin-full luci-theme-bootstrap \
+	-opkg -libpthread \
+	-kmod-nls-base -ip6tables -kmod-gpio-button-hotplug -kmod-usb-core \
+	-kmod-usb-ledtrig-usbport -kmod-usb2 -logd -odhcp6c -ppp -ppp-mod-pppoe"
+
+cp bin/targets/ar71xx/generic/*-factory.bin /tmp/fw.bin
+scp /tmp/fw.bin root@192.168.1.1:/tmp/
+ssh root@192.168.1.1 sysupgrade -v /tmp/fw.bin
+ssh-keygen -f ~/.ssh/known_hosts -R 192.168.1.1
+until ssh root@192.168.1.1; do sleep 5; done
