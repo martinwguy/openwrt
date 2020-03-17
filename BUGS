@@ -1,0 +1,7 @@
+In Network->Diagnostics, traceroute doesn't do anything (it's not installed)
+and Ping says "Ping: bad address '-c'
+------------------------------------------------------------------------
+Status->Logs show nothing (the logging daemon is not installed)
+------------------------------------------------------------------------
+Status->Processes produces no output.
+
