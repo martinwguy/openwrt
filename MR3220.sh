@@ -11,16 +11,19 @@
 # Stuff that's needed:
 # BUSYBOX_CONFIG_ENV	Used by the ifup/ifdown buttons in luci
 #
-# More stuff that could go:
+# Stuff that's not needed:
+# BUSYBOX_CONFIG_BRCTL	Used by Network->interfaces to show info,
+#			seems to make no difference!
 # readlink. /etc/rc.common complains but everything seems to work.
-# UNIX98 devpts support in busybox and kernel.
 # df is only used by System, to show mounted volumes, but I don't see this
 #	output in the web interface.
+# "ip" isn't used by anything
+# "ifconfig" isn't used by anything
 # busybox config->writing PID files.
+# UNIX98 devpts support in busybox and kernel.
 #
 # Other space-saving measures:
 # Make squashfs's blocksize 1024
-# MKLIBS=y
 # Luci->modules->minify
 
 # The last branch to support the MR3220 was 17.01.*;
@@ -88,8 +91,9 @@ echo	TARGET_ar71xx_generic_DEVICE_tl-mr3220-v1=y	# Target profile
 
       # Global build settings
 echo	 SIGNED_PACKAGES=n
+echo	 CLEAN_IPKG=y
 	 # Kernel build options
-echo	 KERNEL_PRINTK=n
+echo	 KERNEL_PRINTK=y
 echo	 KERNEL_CRASHLOG=n
 echo	 KERNEL_SWAP=n
 echo	 KERNEL_DEBUG_FS=n
@@ -100,6 +104,9 @@ echo	 KERNEL_ELF_CORE=n
 echo	 KERNEL_PRINTK_TIME=n
 	 # Package build options
 echo	 IPV6=n
+	 # Stripping options
+echo	 STRIP_KERNEL_EXPORTS=y
+echo	 USE_MKLIBS=y
 	 # Hardening build options
 echo	 PKG_CHECK_FORMAT_SECURITY=n
 echo	 PKG_CC_STACKPROTECTION_NONE=y
@@ -201,11 +208,10 @@ echo	    BUSYBOX_CONFIG_FEATURE_GREP_EGREP_ALIAS=n # grep -E is only used by
 echo	    BUSYBOX_CONFIG_FEATURE_GREP_CONTEXT=n
 echo	    BUSYBOX_CONFIG_XARGS=n
       #   Login/password management utilities
-#echo	    BUSYBOX_CONFIG_FEATURE_SHADOWPASSWDS=n
 echo	    BUSYBOX_CONFIG_FEATURE_PASSWD_WEAK_CHECK=n
       #   Linux system utilities
 echo	    BUSYBOX_CONFIG_FEATURE_MOUTNT_CIFS=n	# Don't need to mount Samba
-echo	    BUSYBOX_CONFIG_DMESG=n
+echo	    BUSYBOX_CONFIG_DMESG=y		# Luci uses this
 echo	    BUSYBOX_CONFIG_HWCLOCK=n
 echo	    BUSYBOX_CONFIG_MKSWAP=n
 echo	    BUSYBOX_CONFIG_FEATURE_MOUNT_LOOP=n
@@ -219,10 +225,11 @@ echo	    BUSYBOX_CONFIG_NC=n
 echo	    BUSYBOX_CONFIG_FEATURE_FANCY_PING=y		# Luci uses ping -c
 echo	    BUSYBOX_CONFIG_FEATURE_IPV6=n
 echo	    BUSYBOX_CONFIG_VERBOSE_RESOLUTION_ERRORS=n
-echo	    BUSYBOX_CONFIG_BRCTL=n
-echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_STATUS=n
+echo	    BUSYBOX_CONFIG_BRCTL=y			# uhttpd uses this 
+echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_STATUS=y	# For me
 echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_HW=n
 echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_BROADCAST_PLUS=n
+echo	    BUSYBOX_CONFIG_IP=n
 echo	    BUSYBOX_CONFIG_NETSTAT=n
 echo	    BUSYBOX_CONFIG_FEATURE_NTPD_SERVER=n
 echo	    BUSYBOX_CONFIG_TRACEROUTE=y			# Used by Luci, unnecessary
@@ -247,7 +254,7 @@ echo	    BUSYBOX_CONFIG_SH_MATH_SUPPORT_64=n
       #   System logging utilities
 echo	    BUSYBOX_CONFIG_LOGGER=n
 echo	DROPBEAR_CURVE25519=n
-echo	PACKAGE_logd=n
+echo	PACKAGE_logd=y		# Luci->Status->*log needs this
 echo	PACKAGE_opkg=n
 echo	PACKAGE_rpcd=y		# needed by luci
 echo	PACKAGE_swconfig=n
@@ -320,10 +327,17 @@ make image TARGET=tl-mr3220-v1 PACKAGES="base-files busybox dnsmasq dropbear \
 	luci-base luci-app-firewall luci-mod-admin-full luci-theme-bootstrap \
 	-opkg -libpthread \
 	-kmod-nls-base -ip6tables -kmod-gpio-button-hotplug -kmod-usb-core \
-	-kmod-usb-ledtrig-usbport -kmod-usb2 -logd -odhcp6c -ppp -ppp-mod-pppoe"
+	-kmod-usb-ledtrig-usbport -kmod-usb2 -odhcp6c -ppp -ppp-mod-pppoe"
 
 cp bin/targets/ar71xx/generic/*-factory.bin /tmp/fw.bin
-scp /tmp/fw.bin root@192.168.1.1:/tmp/
-ssh root@192.168.1.1 sysupgrade -v /tmp/fw.bin
+until scp /tmp/fw.bin root@192.168.1.1:/tmp/
+do sleep 5; done
+
+until ssh root@192.168.1.1 sysupgrade -v /tmp/fw.bin
+do sleep 5; done
+
+# The sysupgrade changes the host keys
 ssh-keygen -f ~/.ssh/known_hosts -R 192.168.1.1
-until ssh root@192.168.1.1; do sleep 5; done
+
+until ssh root@192.168.1.1
+do sleep 5; done
