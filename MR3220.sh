@@ -14,8 +14,14 @@
 # More stuff that could go:
 # readlink. /etc/rc.common complains but everything seems to work.
 # UNIX98 devpts support in busybox and kernel.
-# df
-# du probably too.
+# df is only used by System, to show mounted volumes, but I don't see this
+#	output in the web interface.
+# busybox config->writing PID files.
+#
+# Other space-saving measures:
+# Make squashfs's blocksize 1024
+# MKLIBS=y
+# Luci->modules->minify
 
 # The last branch to support the MR3220 was 17.01.*;
 # branch openwrt-18.06 doesn't include mr3220 when ar71xx is selected.
@@ -210,7 +216,7 @@ echo	    BUSYBOX_CONFIG_CRONTAB=n
 echo	    BUSYBOX_CONFIG_TIME=n
       #   Networking utilities
 echo	    BUSYBOX_CONFIG_NC=n
-echo	    BUSYBOX_CONFIG_FEATURE_FANCY_PING=n
+echo	    BUSYBOX_CONFIG_FEATURE_FANCY_PING=y		# Luci uses ping -c
 echo	    BUSYBOX_CONFIG_FEATURE_IPV6=n
 echo	    BUSYBOX_CONFIG_VERBOSE_RESOLUTION_ERRORS=n
 echo	    BUSYBOX_CONFIG_BRCTL=n
@@ -219,14 +225,21 @@ echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_HW=n
 echo	    BUSYBOX_CONFIG_FEATURE_IFCONFIG_BROADCAST_PLUS=n
 echo	    BUSYBOX_CONFIG_NETSTAT=n
 echo	    BUSYBOX_CONFIG_FEATURE_NTPD_SERVER=n
-echo	    BUSYBOX_CONFIG_TRACEROUTE=n
+echo	    BUSYBOX_CONFIG_TRACEROUTE=y			# Used by Luci, unnecessary
 echo	    BUSYBOX_CONFIG_FEATURE_UDHCP_RFC3397=n
       #   Process utilities
-echo	    BUSYBOX_CONFIG_TOP=n
+echo	    BUSYBOX_CONFIG_TOP=y	# Used by Luci Status->Processes (?)
+echo	     BUSYBOX_CONFIG_FEATURE_TOP_CPU_GLOBAL_PERCENTS=n
+echo	     BUSYBOX_CONFIG_FEATURE_TOP_CPU_USAGE_PERCENTAGE=y # Used by luci
 echo	    BUSYBOX_CONFIG_UPTIME=n
 echo	    BUSYBOX_CONFIG_PGREP=n
 echo	    BUSYBOX_CONFIG_PIDOF=n	# Used by /etc/init.d/dropbear killclients
 					# and by dnsmasq but only to log something
+# openvpn.lua uses "ps w" to find the PIDs of running openvpn processes,
+# to be able to say "yes" or "no" in the "Started" column of its luci page.
+# The '-w' it also needs is enabled by default.
+echo	    BUSYBOX_CONFIG_PS=y
+
       #   Shells
 echo	    BUSYBOX_CONFIG_ASH_COMMAND=n
 echo	    BUSYBOX_CONFIG_ASH_EXPAND_PRMT=n
