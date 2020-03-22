@@ -71,7 +71,8 @@ for a in host target-mips_24kc_musl-1.1.16 toolchain-mips_24kc_gcc-5.4.0_musl-1.
 	mkdir -p staging_dir/$a
 	rm -rf staging_dir/$a/ccache
 	ln -s ../../../ccache/$a staging_dir/$a/ccache
-	CCACHE_DIR=../ccache/$a ccache -z
+	# Zero the caches' statistics so we can see how useful it was
+	CCACHE_DIR=../ccache/$a ccache -z > /dev/null
 done
 
 # Configuration options tuned for minimal flash size
