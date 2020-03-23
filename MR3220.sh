@@ -1,6 +1,7 @@
 #! /bin/sh
 
-# Fetch and build the firmware for the TP-Link TL_MR3220v1
+# Fetch and build the OpenWRT firmware for the 4MB TP-Link TL_MR3220v1
+# including LuCI and openvpn
 
 # This removes anything "unnecessary", including
 # USB support
@@ -9,7 +10,7 @@
 # opkg (though /usr/lib/opkg persists at 136K)
 #
 # Stuff that's needed:
-# BUSYBOX_CONFIG_ENV	Used by the ifup/ifdown buttons in luci
+# BUSYBOX_CONFIG_ENV	Used by the ifup/ifdown buttons in LuCI
 #
 # Stuff that's not needed:
 # BUSYBOX_CONFIG_BRCTL	Used by Network->interfaces to show info,
@@ -67,7 +68,12 @@ fi
 
 }
 
-test -d $BRANCH && cd $BRANCH
+if test -d $BRANCH
+then cd $BRANCH
+else
+	echo "The lede source directory has not been created."
+	exit 1
+fi
 
 # We keep the download directory elsewhere to protect it from deletion
 mkdir -p ../dl
@@ -83,6 +89,11 @@ for a in host target-mips_24kc_musl-1.1.16 toolchain-mips_24kc_gcc-5.4.0_musl-1.
 	# Zero the caches' statistics so we can see how useful it was
 	CCACHE_DIR=../ccache/$a ccache -z > /dev/null
 done
+
+# Include the LuCI sources
+scripts/feeds update luci
+scripts/feeds install -p luci luci-base luci-app-firewall luci-mod-admin-full \
+			      luci-theme-bootstrap luci-app-openvpn
 
 # Configuration options tuned for minimal flash size
 (
@@ -119,9 +130,6 @@ echo	DEVEL=y
 echo	 CCACHE=y
 echo	 TOOLCHAINOPTS=y
 echo	  GDB=n			# Reduce build time
-
-      # Build the LEDE Image Builder
-echo    IB=y
 
       # Base system
       #  Busybox
@@ -237,13 +245,13 @@ echo	    BUSYBOX_CONFIG_FEATURE_UDHCP_RFC3397=n
       #   Process utilities
 echo	    BUSYBOX_CONFIG_TOP=y	# Used by Luci Status->Processes (?)
 echo	     BUSYBOX_CONFIG_FEATURE_TOP_CPU_GLOBAL_PERCENTS=n
-echo	     BUSYBOX_CONFIG_FEATURE_TOP_CPU_USAGE_PERCENTAGE=y # Used by luci
+echo	     BUSYBOX_CONFIG_FEATURE_TOP_CPU_USAGE_PERCENTAGE=y # Used by LuCI
 echo	    BUSYBOX_CONFIG_UPTIME=n
 echo	    BUSYBOX_CONFIG_PGREP=n
 echo	    BUSYBOX_CONFIG_PIDOF=n	# Used by /etc/init.d/dropbear killclients
 					# and by dnsmasq but only to log something
 # openvpn.lua uses "ps w" to find the PIDs of running openvpn processes,
-# to be able to say "yes" or "no" in the "Started" column of its luci page.
+# to be able to say "yes" or "no" in the "Started" column of its LuCI page.
 # The '-w' it also needs is enabled by default.
 echo	    BUSYBOX_CONFIG_PS=y
 
@@ -256,7 +264,7 @@ echo	    BUSYBOX_CONFIG_LOGGER=n
 echo	DROPBEAR_CURVE25519=n
 echo	PACKAGE_logd=y		# Luci->Status->*log needs this
 echo	PACKAGE_opkg=n
-echo	PACKAGE_rpcd=y		# needed by luci
+echo	PACKAGE_rpcd=y		# needed by LuCI
 echo	PACKAGE_swconfig=n
 
       # Kernel modules
@@ -281,19 +289,27 @@ echo	   PACKAGE_MAC80211_MESH=n
 
       # Languages
       #  Lua
-echo	  PACKAGE_libiwinfo-lua=y	# Needed by luci
-echo	  PACKAGE_lua=y			# Needed by luci
+echo	  PACKAGE_libiwinfo-lua=y	# Needed by LuCI
+echo	  PACKAGE_lua=y			# Needed by LuCI
 
       # Libraries
-echo	 PACKAGE_libubus-lua=y		# Needed by luci
-echo	 PACKAGE_libuci-lua=y		# Needed by luci
+echo	 PACKAGE_libubus-lua=y		# Needed by LuCI
+echo	 PACKAGE_libuci-lua=y		# Needed by LuCI
+
+      # LuCI
+echo	 PACKAGE_luci-base=y
+echo	 LUCI_SRCDIET=y			# saves 262144 bytes (!)
+echo	 PACKAGE_luci-mod-admin-full=y
+echo	 PACKAGE_luci-app-firewall=y
+echo	 PACKAGE_luci-app-openvpn=y
+echo	 PACKAGE_luci-theme-bootstrap=y
 
       # Network
       #  VPN
 echo	  PACKAGE_openvpn-openssl=y
       #  Web servers/proxies
-echo	  PACKAGE_uhttpd=y		# Needed by luci
-echo	  PACKAGE_uhttpd-mod-ubus=y	# Needed by luci
+echo	  PACKAGE_uhttpd=y		# Needed by LuCI
+echo	  PACKAGE_uhttpd-mod-ubus=y	# Needed by LuCI
 echo	 PACKAGE_ppp=n
 echo	 PACKAGE_wpad-mini=n		# I don't use WPA
 
@@ -301,35 +317,12 @@ echo	 PACKAGE_wpad-mini=n		# I don't use WPA
 
 make defconfig
 
-$DOWNLOAD && make download
-rm -rf bin/targets/ar71xx/generic/*
-make -j4
-
-test "`basename $(pwd)`" = $BRANCH && cd ..
-rm -rf lede-imagebuilder-*
-tar xf "$(find $BRANCH -name lede-imagebuilder-*z)"
-cd lede-imagebuilder-*
-( echo src imagebuilder file:packages
-  echo src/gz reboot http://downloads.lede-project.org/releases/17.01-SNAPSHOT/packages/mips_24kc/luci
-) > repositories.conf
-
-make image TARGET=tl-mr3220-v1 PACKAGES="base-files busybox dnsmasq dropbear \
-	firewall fstools fwtool hostapd-common iptables iw jshn jsonfilter kernel \
-	kmod-ath kmod-ath9k kmod-ath9k-common kmod-cfg80211 kmod-ipt-conntrack \
-	kmod-ipt-core kmod-ipt-nat kmod-mac80211 kmod-nf-conntrack kmod-nf-ipt \
-	kmod-nf-nat kmod-nls-base libblobmsg-json libc libgcc libip4tc \
-	libiwinfo-lua libjson-c libjson-script liblua libnl-tiny libpthread \
-	libubox libubus libubus-lua libuci libuci-lua libuclient libxtables lua \
-	luci-app-firewall luci-base luci-lib-ip luci-lib-jsonc luci-lib-nixio \
-	mtd netifd odhcpd procd rpcd uboot-envtools ubox ubus ubusd uci \
-	uclient-fetch uhttpd uhttpd-mod-ubus wpad-mini \
-	openvpn-openssl luci-app-openvpn \
-	luci-base luci-app-firewall luci-mod-admin-full luci-theme-bootstrap \
-	-opkg -libpthread \
-	-kmod-nls-base -ip6tables -kmod-gpio-button-hotplug -kmod-usb-core \
-	-kmod-usb-ledtrig-usbport -kmod-usb2 -odhcp6c -ppp -ppp-mod-pppoe"
-
+$DOWNLOAD && make download		# If we haven't fetched the sources, do so.
+rm -rf bin/targets/ar71xx/generic/*	# Don't be fooled by stale objects
+make -j4				# Build the firmware
 cp bin/targets/ar71xx/generic/*-factory.bin /tmp/fw.bin
+					# and put it somewhere handy
+
 until scp /tmp/fw.bin root@192.168.1.1:/tmp/
 do sleep 5; done
 
