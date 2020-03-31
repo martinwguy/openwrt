@@ -48,6 +48,7 @@ else
 fi
 
 $DOWNLOAD && {
+
 test -d $BRANCH && {
 	echo -n "Do you really want to wipe out $BRANCH and start over? "
 	read a
@@ -67,7 +68,11 @@ if [ -f $BRANCH.tgz ]; then
 	echo Unpacking into \'$BRANCH\'...
 	tar xzf $BRANCH.tgz
 else
-	git clone https://git.openwrt.org/openwrt/openwrt.git -b $BRANCH $BRANCH
+	git clone https://git.openwrt.org/openwrt/openwrt.git -b $BRANCH $BRANCH ||{
+	    echo "Failed to clone OpenWRT's git repository" 1>&2
+	    exit 1
+	}
+
 	tar czf $BRANCH.tgz $BRANCH
 fi
 
