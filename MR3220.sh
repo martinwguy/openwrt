@@ -19,8 +19,8 @@ routerip=192.168.1.1
 # ...and lots of other stuff
 #
 # Stuff that's included but not needed:
-# BUSYBOX_CONFIG_BRCTL	Used by Network->interfaces to show info,
-#			seems to make no difference!
+# BUSYBOX_CONFIG_BRCTL	Used by Network->interfaces to show info but
+#			seems to make no difference.
 # readlink. /etc/rc.common complains but everything seems to work.
 # "df" is only used by System, to show mounted volumes, but I don't see this
 #	output in the web interface.
@@ -28,10 +28,10 @@ routerip=192.168.1.1
 # "ifconfig" isn't used by anything
 # busybox config->writing PID files.
 # UNIX98 devpts support in busybox and kernel (probably).
+# PACKAGE_wpad-mini=n		# Uncomment this line below if you don't use WPA
 #
 # Other space-saving measures:
 # Make squashfs's blocksize 1024
-# Luci->modules->minify
 
 # The last branch to support the MR3220 was 17.01.*;
 # branch openwrt-18.06 doesn't include mr3220 when ar71xx is selected.
@@ -40,7 +40,7 @@ BRANCH=lede-17.01
 
 # $DOWNLOAD: Do we need to download/unpack the source tree?
 # Do so if it doesn't exist. Note that this script may also be run from the top
-# directory of the source tree, as "../MR3220", so check for that case too.
+# directory of the source tree, as "../MR3220", so we check for that case too.
 if [ -d $BRANCH -o "`basename $(pwd)`" = $BRANCH ]; then
 	DOWNLOAD=false
 else
@@ -65,7 +65,7 @@ fi
 # Fetch openwrt, but only once
 if [ -f $BRANCH.tgz ]; then
 	echo Unpacking into \'$BRANCH\'...
-	tar xf $BRANCH.tgz
+	tar xzf $BRANCH.tgz
 else
 	git clone https://git.openwrt.org/openwrt/openwrt.git -b $BRANCH $BRANCH
 	tar czf $BRANCH.tgz $BRANCH
@@ -317,7 +317,7 @@ echo	  PACKAGE_openvpn-openssl=y
 echo	  PACKAGE_uhttpd=y		# Needed by LuCI
 echo	  PACKAGE_uhttpd-mod-ubus=y	# Needed by LuCI
 echo	 PACKAGE_ppp=n
-echo	 PACKAGE_wpad-mini=n		# I don't use WPA
+#echo	 PACKAGE_wpad-mini=n		# Uncomment if you don't use WPA
 
 ) | sed 's/^/CONFIG_/' > .config
 
