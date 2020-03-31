@@ -3,25 +3,31 @@
 # Fetch and build the OpenWRT firmware for the 4MB TP-Link TL_MR3220v1
 # including LuCI and openvpn
 
-# This removes anything "unnecessary", including
-# USB support
-# PPPoE support
-# md5sum, even though some scripts seem to call it, everything works.
-# opkg (though /usr/lib/opkg persists at 136K)
+routerip=192.168.1.1
+
+# Install the usual things that the lede builder needs,
+# as well as ccache and openssh-client
+
+# This chooses all the smallest config options
+# and removes anything "unnecessary", including:
+# - USB support
+# - PPPoE support
+# - opkg
+# - IPv6 support
+# - command-line editing and history
+# - Usage and verbose error messages
+# ...and lots of other stuff
 #
-# Stuff that's needed:
-# BUSYBOX_CONFIG_ENV	Used by the ifup/ifdown buttons in LuCI
-#
-# Stuff that's not needed:
+# Stuff that's included but not needed:
 # BUSYBOX_CONFIG_BRCTL	Used by Network->interfaces to show info,
 #			seems to make no difference!
 # readlink. /etc/rc.common complains but everything seems to work.
-# df is only used by System, to show mounted volumes, but I don't see this
+# "df" is only used by System, to show mounted volumes, but I don't see this
 #	output in the web interface.
 # "ip" isn't used by anything
 # "ifconfig" isn't used by anything
 # busybox config->writing PID files.
-# UNIX98 devpts support in busybox and kernel.
+# UNIX98 devpts support in busybox and kernel (probably).
 #
 # Other space-saving measures:
 # Make squashfs's blocksize 1024
@@ -45,8 +51,7 @@ $DOWNLOAD && {
 test -d $BRANCH && {
 	echo -n "Do you really want to wipe out $BRANCH and start over? "
 	read a
-	if [ "$a" != "y" ]; then
-		echo "Use $0 -nd"
+	if [ "$a" != y && "$a" != yes ]; then
 		exit 1
 	fi
 }
@@ -159,8 +164,9 @@ echo	    BUSYBOX_CONFIG_ID=n
 echo	    BUSYBOX_CONFIG_FEATURE_TEST_64=n
 echo	    BUSYBOX_CONFIG_FEATURE_TOUCH_SUSV3=n
 echo	    BUSYBOX_CONFIG_FEATURE_TR_CLASSES=n
-#echo	    BUSYBOX_CONFIG_DF=n
+echo	    BUSYBOX_CONFIG_DF=y		# Used in theory but ineffective. See above.
 echo	    BUSYBOX_CONFIG_DU=n
+echo	    BUSYBOX_CONFIG_ENV=y	# Used by the ifup/ifdown buttons in LuCI
 echo	    BUSYBOX_CONFIG_EXPR=n
 echo	    BUSYBOX_CONFIG_FSYNC=n
 echo	    BUSYBOX_CONFIG_HEAD=n
@@ -169,7 +175,7 @@ echo	     BUSYBOX_CONFIG_FEATURE_LS_FOLLOWLINKS=n
 echo	     BUSYBOX_CONFIG_FEATURE_LS_SORTFILES=n
 echo	     BUSYBOX_CONFIG_FEATURE_LS_TIMESTAMPS=n
 echo	     BUSYBOX_CONFIG_FEATURE_LS_USERNAME=n
-echo	    BUSYBOX_CONFIG_MD5SUM=n
+echo	    BUSYBOX_CONFIG_MD5SUM=n	# Some scripts call it, but all works.
 echo	    BUSYBOX_CONFIG_MKFIFO=n
 echo	    BUSYBOX_CONFIG_MKNOD=n
 echo	    BUSYBOX_CONFIG_NICE=n
@@ -323,14 +329,13 @@ make -j4				# Build the firmware
 cp bin/targets/ar71xx/generic/*-factory.bin /tmp/fw.bin
 					# and put it somewhere handy
 
+# Copy the firmware to the router
 until scp /tmp/fw.bin root@192.168.1.1:/tmp/
 do sleep 5; done
 
-until ssh root@192.168.1.1 sysupgrade -v /tmp/fw.bin
+# Install it
+until ssh root@$routerip sysupgrade /tmp/fw.bin
 do sleep 5; done
 
 # The sysupgrade changes the host keys
-ssh-keygen -f ~/.ssh/known_hosts -R 192.168.1.1
-
-until ssh root@192.168.1.1
-do sleep 5; done
+ssh-keygen -f ~/.ssh/known_hosts -R $routerip
