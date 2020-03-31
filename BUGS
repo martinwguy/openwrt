@@ -1,1 +1,5 @@
-
+------------------------------------------------------------------------
+Syslog says:
+daemon.err odhcpd[1225]: Failed to open routing table: No such file or directory
+daemon.err odhcpd[1225]: Unable to open raw socket: Address family not supported by protocol
+------------------------------------------------------------------------
