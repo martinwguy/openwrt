@@ -1,12 +1,24 @@
 #! /bin/sh
 
-# Fetch and build the OpenWRT firmware for the 4MB TP-Link TL_MR3220v1
-# including LuCI and openvpn
+# This script fetches and builds the OpenWRT firmware for the TP-Link TL_MR3220v1
+# including LuCI and OpenVPN and writes it to the router's 4MB Flash memory,
+# no questions asked.
 
-routerip=192.168.1.1
+# Usage: sh MR3220.sh
+# Flag: -jN	Use N processors.
 
-# Install the usual things that the lede builder needs,
-# as well as ccache and openssh-client
+# Process command-line options
+for a
+do
+    case "$a" in
+    -j*)	MAKEFLAGS="$MAKEFLAGS\ $a"
+    esac
+done
+
+router_ip=192.168.1.1
+
+# Install the usual things that the lede builder needs, and ccache
+# sudo apt-get install build-essential libncursesw5-dev python unzip ccache
 
 # This chooses all the smallest config options
 # and removes anything "unnecessary", including:
@@ -48,7 +60,6 @@ else
 fi
 
 $DOWNLOAD && {
-
 test -d $BRANCH && {
 	echo -n "Do you really want to wipe out $BRANCH and start over? "
 	read a
@@ -68,11 +79,7 @@ if [ -f $BRANCH.tgz ]; then
 	echo Unpacking into \'$BRANCH\'...
 	tar xzf $BRANCH.tgz
 else
-	git clone https://git.openwrt.org/openwrt/openwrt.git -b $BRANCH $BRANCH ||{
-	    echo "Failed to clone OpenWRT's git repository" 1>&2
-	    exit 1
-	}
-
+	git clone https://git.openwrt.org/openwrt/openwrt.git -b $BRANCH $BRANCH
 	tar czf $BRANCH.tgz $BRANCH
 fi
 
@@ -330,7 +337,7 @@ make defconfig
 
 $DOWNLOAD && make download		# If we haven't fetched the sources, do so.
 rm -rf bin/targets/ar71xx/generic/*	# Don't be fooled by stale objects
-make -j4				# Build the firmware
+make $MAKEFLAGS				# Build the firmware
 cp bin/targets/ar71xx/generic/*-factory.bin /tmp/fw.bin
 					# and put it somewhere handy
 
@@ -339,8 +346,8 @@ until scp /tmp/fw.bin root@192.168.1.1:/tmp/
 do sleep 5; done
 
 # Install it
-until ssh root@$routerip sysupgrade /tmp/fw.bin
+until ssh root@$router_ip sysupgrade /tmp/fw.bin
 do sleep 5; done
 
 # The sysupgrade changes the host keys
-ssh-keygen -f ~/.ssh/known_hosts -R $routerip
+ssh-keygen -f ~/.ssh/known_hosts -R $router_ip
